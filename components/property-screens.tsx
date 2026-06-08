@@ -945,7 +945,7 @@ export function PropertyScreens({ propertyAddress, initialUnitType, initialEstim
   // fetch rubric comps + quantiles
   useEffect(() => {
     if (!propertyAddress.lat || !propertyAddress.lng) return
-    fetch(`/api/comps?lat=${propertyAddress.lat}&lng=${propertyAddress.lng}&bedrooms=${beds}&address=${encodeURIComponent(propertyAddress.formattedAddress)}`)
+    fetch(`/api/comps?lat=${propertyAddress.lat}&lng=${propertyAddress.lng}&bedrooms=${beds}&bathrooms=${initialUnit.baths}&zip=${encodeURIComponent(propertyAddress.zip ?? "")}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.comps) setComps(data.comps)

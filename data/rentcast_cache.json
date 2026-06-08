@@ -1,0 +1,298 @@
+{
+  "generated": "2026-06-08T22:12:58.605132Z",
+  "zones": {
+    "north_oakland": {
+      "label": "North Oakland / Rockridge",
+      "zips": [
+        "94618",
+        "94611"
+      ],
+      "address": "5200 College Ave, Oakland, CA 94618",
+      "units": {
+        "studio": {
+          "label": "Studio",
+          "beds": 0,
+          "baths": 1,
+          "rent": 1920,
+          "min": 1570,
+          "max": 2260
+        },
+        "1br_1ba": {
+          "label": "1BR/1BA",
+          "beds": 1,
+          "baths": 1,
+          "rent": 2290,
+          "min": 1980,
+          "max": 2600
+        },
+        "2br_1ba": {
+          "label": "2BR/1BA",
+          "beds": 2,
+          "baths": 1,
+          "rent": 3070,
+          "min": 2650,
+          "max": 3500
+        },
+        "2br_2ba": {
+          "label": "2BR/2BA",
+          "beds": 2,
+          "baths": 2,
+          "rent": 3420,
+          "min": 2750,
+          "max": 4090
+        },
+        "3br_1ba": {
+          "label": "3BR/1BA",
+          "beds": 3,
+          "baths": 1,
+          "rent": 3950,
+          "min": 3770,
+          "max": 4130
+        },
+        "3br_2ba": {
+          "label": "3BR/2BA",
+          "beds": 3,
+          "baths": 2,
+          "rent": 3950,
+          "min": 3770,
+          "max": 4130
+        }
+      }
+    },
+    "temescal": {
+      "label": "Temescal / North Oakland",
+      "zips": [
+        "94608",
+        "94609"
+      ],
+      "address": "4801 Shattuck Ave, Oakland, CA 94609",
+      "units": {
+        "studio": {
+          "label": "Studio",
+          "beds": 0,
+          "baths": 1,
+          "rent": 2430,
+          "min": 2060,
+          "max": 2810
+        },
+        "1br_1ba": {
+          "label": "1BR/1BA",
+          "beds": 1,
+          "baths": 1,
+          "rent": 2160,
+          "min": 2110,
+          "max": 2210
+        },
+        "2br_1ba": {
+          "label": "2BR/1BA",
+          "beds": 2,
+          "baths": 1,
+          "rent": 2580,
+          "min": 2320,
+          "max": 2840
+        },
+        "2br_2ba": {
+          "label": "2BR/2BA",
+          "beds": 2,
+          "baths": 2,
+          "rent": 2480,
+          "min": 2320,
+          "max": 2630
+        },
+        "3br_1ba": {
+          "label": "3BR/1BA",
+          "beds": 3,
+          "baths": 1,
+          "rent": 3150,
+          "min": 2560,
+          "max": 3740
+        },
+        "3br_2ba": {
+          "label": "3BR/2BA",
+          "beds": 3,
+          "baths": 2,
+          "rent": 3420,
+          "min": 2810,
+          "max": 4030
+        }
+      }
+    },
+    "lake_merritt": {
+      "label": "Lake Merritt / Grand Lake",
+      "zips": [
+        "94610",
+        "94612"
+      ],
+      "address": "528 Merritt Ave, Oakland, CA 94610",
+      "units": {
+        "studio": {
+          "label": "Studio",
+          "beds": 0,
+          "baths": 1,
+          "rent": 1900,
+          "min": 1740,
+          "max": 2050
+        },
+        "1br_1ba": {
+          "label": "1BR/1BA",
+          "beds": 1,
+          "baths": 1,
+          "rent": 2390,
+          "min": 2230,
+          "max": 2550
+        },
+        "2br_1ba": {
+          "label": "2BR/1BA",
+          "beds": 2,
+          "baths": 1,
+          "rent": 2710,
+          "min": 2410,
+          "max": 3010
+        },
+        "2br_2ba": {
+          "label": "2BR/2BA",
+          "beds": 2,
+          "baths": 2,
+          "rent": 3090,
+          "min": 2920,
+          "max": 3250
+        },
+        "3br_1ba": {
+          "label": "3BR/1BA",
+          "beds": 3,
+          "baths": 1,
+          "rent": 3720,
+          "min": 3010,
+          "max": 4430
+        },
+        "3br_2ba": {
+          "label": "3BR/2BA",
+          "beds": 3,
+          "baths": 2,
+          "rent": 4370,
+          "min": 3400,
+          "max": 5340
+        }
+      }
+    },
+    "fruitvale": {
+      "label": "Fruitvale / Dimond",
+      "zips": [
+        "94601",
+        "94602",
+        "94606",
+        "94619"
+      ],
+      "address": "3806 39th Ave, Oakland, CA 94619",
+      "units": {
+        "studio": {
+          "label": "Studio",
+          "beds": 0,
+          "baths": 1,
+          "rent": 1350,
+          "min": 1120,
+          "max": 1580
+        },
+        "1br_1ba": {
+          "label": "1BR/1BA",
+          "beds": 1,
+          "baths": 1,
+          "rent": 1900,
+          "min": 1710,
+          "max": 2090
+        },
+        "2br_1ba": {
+          "label": "2BR/1BA",
+          "beds": 2,
+          "baths": 1,
+          "rent": 2110,
+          "min": 1910,
+          "max": 2310
+        },
+        "2br_2ba": {
+          "label": "2BR/2BA",
+          "beds": 2,
+          "baths": 2,
+          "rent": 2770,
+          "min": 2710,
+          "max": 2830
+        },
+        "3br_1ba": {
+          "label": "3BR/1BA",
+          "beds": 3,
+          "baths": 1,
+          "rent": 2580,
+          "min": 2400,
+          "max": 2770
+        },
+        "3br_2ba": {
+          "label": "3BR/2BA",
+          "beds": 3,
+          "baths": 2,
+          "rent": 2990,
+          "min": 2560,
+          "max": 3420
+        }
+      }
+    },
+    "east_oakland": {
+      "label": "East Oakland",
+      "zips": [
+        "94603",
+        "94605",
+        "94621"
+      ],
+      "address": "1000 85th Ave, Oakland, CA 94621",
+      "units": {
+        "studio": {
+          "label": "Studio",
+          "beds": 0,
+          "baths": 1,
+          "rent": 1600,
+          "min": 1330,
+          "max": 1870
+        },
+        "1br_1ba": {
+          "label": "1BR/1BA",
+          "beds": 1,
+          "baths": 1,
+          "rent": 1730,
+          "min": 1590,
+          "max": 1870
+        },
+        "2br_1ba": {
+          "label": "2BR/1BA",
+          "beds": 2,
+          "baths": 1,
+          "rent": 2760,
+          "min": 2210,
+          "max": 3300
+        },
+        "2br_2ba": {
+          "label": "2BR/2BA",
+          "beds": 2,
+          "baths": 2,
+          "rent": 2480,
+          "min": 1940,
+          "max": 3030
+        },
+        "3br_1ba": {
+          "label": "3BR/1BA",
+          "beds": 3,
+          "baths": 1,
+          "rent": 2860,
+          "min": 2400,
+          "max": 3320
+        },
+        "3br_2ba": {
+          "label": "3BR/2BA",
+          "beds": 3,
+          "baths": 2,
+          "rent": 2480,
+          "min": 1870,
+          "max": 3090
+        }
+      }
+    }
+  }
+}

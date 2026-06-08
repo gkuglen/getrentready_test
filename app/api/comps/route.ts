@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { buildQuantiles } from "@/lib/grr-model"
 import allCompsData from "@/data/bplus_comps.json"
-
-const RENTCAST_BASE_URL = "https://api.rentcast.io/v1"
+import rentcastCache from "@/data/rentcast_cache.json"
 
 interface BplusComp {
   address: string
@@ -35,29 +34,35 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-async function fetchRentcastRange(address: string, bedrooms: number) {
-  try {
-    const params = new URLSearchParams({
-      address,
-      bedrooms: String(bedrooms),
-      propertyType: "Apartment",
-      compCount: "5",
-    })
-    const res = await fetch(`${RENTCAST_BASE_URL}/avm/rent/long-term?${params}`, {
-      headers: {
-        "X-Api-Key": process.env.RENTCAST_API_KEY!,
-        accept: "application/json",
-      },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    return {
-      min: data.rentRangeLow ?? null,
-      max: data.rentRangeHigh ?? null,
-    }
-  } catch {
-    return null
-  }
+// ZIP code → cache zone ID
+const ZIP_TO_ZONE: Record<string, string> = {
+  "94618": "north_oakland", "94611": "north_oakland",
+  "94608": "temescal",      "94609": "temescal",
+  "94610": "lake_merritt",  "94612": "lake_merritt",
+  "94601": "fruitvale",     "94602": "fruitvale",
+  "94606": "fruitvale",     "94619": "fruitvale",
+  "94603": "east_oakland",  "94605": "east_oakland", "94621": "east_oakland",
+}
+const DEFAULT_ZONE = "lake_merritt"
+
+// beds + baths → cache unit type ID
+function unitTypeId(beds: number, baths: number): string {
+  if (beds === 0) return "studio"
+  if (beds === 1) return "1br_1ba"
+  if (beds === 2) return baths >= 2 ? "2br_2ba" : "2br_1ba"
+  if (beds === 3) return baths >= 2 ? "3br_2ba" : "3br_1ba"
+  return "3br_2ba"
+}
+
+// Look up min/max from the pre-built cache
+function getCachedRange(zip: string, beds: number, baths: number) {
+  const zoneId = ZIP_TO_ZONE[zip] ?? DEFAULT_ZONE
+  const zones = rentcastCache.zones as Record<string, { units: Record<string, { min: number | null; max: number | null }> }>
+  const zone = zones[zoneId]
+  if (!zone) return null
+  const unit = zone.units[unitTypeId(beds, baths)]
+  if (!unit) return null
+  return { min: unit.min, max: unit.max, zone: zoneId }
 }
 
 export async function GET(request: NextRequest) {
@@ -65,7 +70,8 @@ export async function GET(request: NextRequest) {
   const lat = parseFloat(searchParams.get("lat") ?? "")
   const lng = parseFloat(searchParams.get("lng") ?? "")
   const bedrooms = parseInt(searchParams.get("bedrooms") ?? "2")
-  const address = searchParams.get("address") ?? ""
+  const bathrooms = parseInt(searchParams.get("bathrooms") ?? "1")
+  const zip = searchParams.get("zip") ?? ""
 
   if (isNaN(lat) || isNaN(lng)) {
     return NextResponse.json({ error: "lat and lng are required" }, { status: 400 })
@@ -95,15 +101,13 @@ export async function GET(request: NextRequest) {
   // All same-BR rents from dataset for quartile computation
   const allRents = matchingBR.map((c) => c.rent as number)
 
-  // Fetch Rentcast min/max in parallel
-  const rentcastRange = address
-    ? await fetchRentcastRange(address, bedrooms)
-    : null
+  // Look up min/max from cache (no live API call)
+  const cachedRange = getCachedRange(zip, bedrooms, bathrooms)
 
   const quantiles = buildQuantiles(
     allRents,
-    rentcastRange?.min ?? undefined,
-    rentcastRange?.max ?? undefined,
+    cachedRange?.min ?? undefined,
+    cachedRange?.max ?? undefined,
   )
 
   return NextResponse.json({
@@ -125,7 +129,7 @@ export async function GET(request: NextRequest) {
     })),
     dataSource: {
       quantilesFrom: "GRR rubric dataset (B+ scored Oakland apartments)",
-      minMaxFrom: rentcastRange ? "Rentcast AVM" : "GRR dataset",
+      minMaxFrom: cachedRange ? `Rentcast cache (${cachedRange.zone.replace("_", " ")})` : "GRR dataset",
       totalSampleSize: matchingBR.length,
     },
   })
