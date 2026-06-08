@@ -16,3 +16,5 @@ google_credentials.json
 node_modules
 .next/
 .DS_Store
+.vercel
+.env*

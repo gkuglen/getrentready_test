@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { readFileSync } from "fs"
-import { join } from "path"
 import { buildQuantiles } from "@/lib/grr-model"
+import allCompsData from "@/data/bplus_comps.json"
 
 const RENTCAST_BASE_URL = "https://api.rentcast.io/v1"
 
@@ -72,9 +71,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "lat and lng are required" }, { status: 400 })
   }
 
-  // Load B+ comp dataset
-  const filePath = join(process.cwd(), "data", "bplus_comps.json")
-  const allComps: BplusComp[] = JSON.parse(readFileSync(filePath, "utf-8"))
+  const allComps: BplusComp[] = allCompsData as BplusComp[]
 
   // Filter to matching bedroom count
   const matchingBR = allComps.filter(
