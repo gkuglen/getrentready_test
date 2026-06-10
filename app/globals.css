@@ -359,6 +359,20 @@
 .ur-opp__body p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ur-ink); }
 .ur-opp__body b { font-weight: 700; }
 
+/* star trigger in unit header delta */
+.ur-head__delta-top { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.ur-head__star { background: none; border: none; padding: 2px; cursor: pointer; color: var(--ur-good-fg); display: flex; align-items: center; flex-shrink: 0; opacity: 0.75; transition: opacity .15s; line-height: 0; }
+.ur-head__star:hover { opacity: 1; transform: scale(1.15); }
+
+/* opportunity modal */
+.ur-opp-modal { padding: 2rem 2rem 1.5rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1rem; }
+.ur-opp-modal__icon { width: 52px; height: 52px; background: var(--ur-mint); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--ur-ink); flex-shrink: 0; }
+.ur-opp-modal__badge { font-family: var(--font-mono), "Geist Mono", monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ur-good-fg); margin: 0; }
+.ur-opp-modal__title { font-size: 22px; font-weight: 700; letter-spacing: -.02em; margin: 0; color: var(--ur-ink); }
+.ur-opp-modal__text { font-size: 15px; line-height: 1.6; color: var(--ur-ink-2); max-width: 400px; margin: 0; }
+.ur-opp-modal__cta { margin-top: 0.5rem; width: 100%; max-width: 280px; }
+.ur-opp-modal__cta .ur-btn--primary { width: 100%; justify-content: center; }
+
 /* market swarm — target marker is INK/black */
 .ur-market__plot { margin: 14px -4px 4px; }
 .ur-dot { fill: color-mix(in oklch, var(--ur-accent) 30%, #fff); opacity: .55; }

@@ -168,12 +168,13 @@ function BulletGraph({ currentRent, target, sliderMin, sliderMax, onChange }: {
 
 // ─── Unit Header Card ─────────────────────────────────────────────────────────
 
-function UnitHeaderCard({ unit, currentRent, target, onCurrent }: {
-  unit: Unit; currentRent: number; target: number; onCurrent: (v: number) => void
+function UnitHeaderCard({ unit, currentRent, target, onCurrent, onOppClick }: {
+  unit: Unit; currentRent: number; target: number
+  onCurrent: (v: number) => void; onOppClick?: () => void
 }) {
   const delta = target - currentRent
   const deltaPct = currentRent ? Math.round((delta / currentRent) * 100) : 0
-  const up = delta >= 0
+  const up = delta > 0
   const curGrade = gradeFromPct(pctRank(currentRent, unit.cloud))
   const tgtGrade = gradeFromPct(pctRank(target, unit.cloud))
 
@@ -189,8 +190,17 @@ function UnitHeaderCard({ unit, currentRent, target, onCurrent }: {
           </div>
         </div>
         <div className="ur-head__delta">
-          <div className={`ur-head__delta-val${up ? "" : " is-down"}`}>
-            {up ? "+" : "−"}{fmt$(Math.abs(delta))}<span>/mo</span>
+          <div className="ur-head__delta-top">
+            <div className={`ur-head__delta-val${up ? "" : " is-down"}`}>
+              {up ? "+" : "−"}{fmt$(Math.abs(delta))}<span>/mo</span>
+            </div>
+            {up && onOppClick && (
+              <button className="ur-head__star" onClick={onOppClick} aria-label="View opportunity details">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor">
+                  <path d="M12 2l2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 16.78 6.8 19.5l.99-5.79-4.21-4.1 5.82-.85z" />
+                </svg>
+              </button>
+            )}
           </div>
           <div className="ur-head__delta-pct">({up ? "+" : "−"}{Math.abs(deltaPct)}%)</div>
         </div>
@@ -222,27 +232,50 @@ function UnitHeaderCard({ unit, currentRent, target, onCurrent }: {
   )
 }
 
-// ─── Opportunity Card ─────────────────────────────────────────────────────────
+// ─── Opportunity Modal ────────────────────────────────────────────────────────
 
-function OpportunityCard({ unit, currentRent, target }: { unit: Unit; currentRent: number; target: number }) {
-  const positive = target > currentRent
+function OpportunityModal({ unit, currentRent, onClose }: {
+  unit: Unit; currentRent: number; onClose: () => void
+}) {
   const bedBath = `${unit.beds === 0 ? "Studio" : `${unit.beds}BR`}/${unit.baths}BA`
+  const city = unit.city.split(",")[0]
+  const pct = pctRank(currentRent, unit.cloud)
+
+  const state = pct < 0.35 ? "below" : pct < 0.67 ? "at" : "above"
+  const content = {
+    below: {
+      badge: "Strong Opportunity",
+      title: "Below Market Rent",
+      text: <>This <b>{bedBath}</b> unit is renting in the lower range of comparable listings in {city}. A targeted renovation could meaningfully increase cash flow and property value.</>,
+    },
+    at: {
+      badge: "Moderate Opportunity",
+      title: "At Market Rent",
+      text: <>This <b>{bedBath}</b> unit is tracking near market rate in {city}. Selective upgrades could push it into the upper tier of comparable listings.</>,
+    },
+    above: {
+      badge: "Well Positioned",
+      title: "Above Market Rent",
+      text: <>This <b>{bedBath}</b> unit is performing at or above comparable listings in {city}. Pushing further may extend vacancy — validate against the comps below.</>,
+    },
+  }[state]
+
   return (
-    <section className="ur-card ur-opp">
-      <div className="ur-opp__icon" aria-hidden>
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
-          <path d="M12 3l2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 16.78 6.8 19.5l.99-5.79-4.21-4.1 5.82-.85z" />
-        </svg>
+    <ModalSheet open onClose={onClose} wide label="Opportunity Assessment">
+      <div className="ur-opp-modal">
+        <div className="ur-opp-modal__icon" aria-hidden>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M12 2l2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 16.78 6.8 19.5l.99-5.79-4.21-4.1 5.82-.85z" />
+          </svg>
+        </div>
+        <p className="ur-opp-modal__badge">{content.badge}</p>
+        <h2 className="ur-opp-modal__title">{content.title}</h2>
+        <p className="ur-opp-modal__text">{content.text}</p>
+        <div className="ur-opp-modal__cta">
+          <button className="ur-btn ur-btn--primary" onClick={onClose}>View Details</button>
+        </div>
       </div>
-      <div className="ur-opp__body">
-        <h2 className="ur-opp__title">{positive ? "Potential Opportunity" : "At or above market"}</h2>
-        <p>
-          {positive
-            ? <>You may be able to increase cash flow and property value. This unit&rsquo;s rent reads lower than comparable <b>{bedBath}</b> listings in {unit.city.split(",")[0]} — a likely opening to raise income by refreshing its present condition.</>
-            : <>Target is tracking at or beyond comparable <b>{bedBath}</b> listings in {unit.city.split(",")[0]}. Pushing further may extend days-on-market — validate against the comps below.</>}
-        </p>
-      </div>
-    </section>
+    </ModalSheet>
   )
 }
 
@@ -918,6 +951,7 @@ export function PropertyScreens({ propertyAddress, initialUnitType, initialEstim
   const [screen, setScreen] = useState<"roll" | "unit">("roll")
   const [activeId, setActiveId] = useState(initialUnit.id)
   const [dir, setDir] = useState(1)
+  const [showOppModal, setShowOppModal] = useState(false)
   const [form, setForm] = useState<{ open: boolean; mode: "add" | "edit" }>({ open: false, mode: "add" })
   const [leadOpen, setLeadOpen] = useState(false)
   const [modalComp, setModalComp] = useState<RentComp | null>(null)
@@ -966,7 +1000,7 @@ export function PropertyScreens({ propertyAddress, initialUnitType, initialEstim
       .catch(() => {})
   }, [propertyAddress.lat, propertyAddress.lng])
 
-  const openUnit = (id: string) => { setActiveId(id); setDir(1); setScreen("unit"); window.scrollTo(0, 0) }
+  const openUnit = (id: string) => { setActiveId(id); setDir(1); setScreen("unit"); setShowOppModal(true); window.scrollTo(0, 0) }
   const backToRoll = () => { setDir(-1); setScreen("roll"); window.scrollTo(0, 0) }
 
   const addUnit = (f: FormState) => {
@@ -1008,26 +1042,34 @@ export function PropertyScreens({ propertyAddress, initialUnitType, initialEstim
         )}
 
         {screen === "unit" && (
-          <div className="ur-stack" data-dir={String(dir)}>
-            <div className="ur-loc">{displayUnit.address} · {displayUnit.city}</div>
-            <UnitHeaderCard unit={displayUnit} currentRent={st.currentRent} target={st.target}
-              onCurrent={(v) => setVal("currentRent", v)} />
-            <OpportunityCard unit={displayUnit} currentRent={st.currentRent} target={st.target} />
-            <MarketCard unit={displayUnit} currentRent={st.currentRent} target={st.target} />
-            <BudgetCard currentRent={st.currentRent} target={st.target}
-              capRate={st.capRate} coc={st.coc}
-              onCap={(v) => setVal("capRate", v)} onCoc={(v) => setVal("coc", v)} />
-            <GradeLadderCard unit={displayUnit} currentRent={st.currentRent} target={st.target} />
-            {comps.length > 0 && <CompsRail comps={comps} onOpen={setModalComp} />}
-            <button className="ur-save" onClick={() => setLeadOpen(true)}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                <path d="M17 21v-8H7v8M7 3v5h8" />
-              </svg>
-              Save report
-            </button>
-            <div className="ur-footnote">Estimates for illustration · not financial advice</div>
-          </div>
+          <>
+            {showOppModal && (
+              <OpportunityModal
+                unit={displayUnit}
+                currentRent={st.currentRent}
+                onClose={() => setShowOppModal(false)}
+              />
+            )}
+            <div className="ur-stack" data-dir={String(dir)}>
+              <div className="ur-loc">{displayUnit.address} · {displayUnit.city}</div>
+              <UnitHeaderCard unit={displayUnit} currentRent={st.currentRent} target={st.target}
+                onCurrent={(v) => setVal("currentRent", v)}
+                onOppClick={st.target > st.currentRent ? () => setShowOppModal(true) : undefined} />
+              <GradeLadderCard unit={displayUnit} currentRent={st.currentRent} target={st.target} />
+              <BudgetCard currentRent={st.currentRent} target={st.target}
+                capRate={st.capRate} coc={st.coc}
+                onCap={(v) => setVal("capRate", v)} onCoc={(v) => setVal("coc", v)} />
+              {comps.length > 0 && <CompsRail comps={comps} onOpen={setModalComp} />}
+              <button className="ur-save" onClick={() => setLeadOpen(true)}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8M7 3v5h8" />
+                </svg>
+                Save report
+              </button>
+              <div className="ur-footnote">Estimates for illustration · not financial advice</div>
+            </div>
+          </>
         )}
       </div>
 
