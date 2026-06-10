@@ -112,6 +112,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     quantiles,
+    rents: allRents,
     comps: nearbyComps.map((c) => ({
       address: c.address,
       city: c.city,

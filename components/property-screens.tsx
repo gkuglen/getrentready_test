@@ -261,7 +261,7 @@ function OpportunityModal({ unit, currentRent, onClose }: {
   }[state]
 
   return (
-    <ModalSheet open onClose={onClose} wide label="Opportunity Assessment">
+    <ModalSheet open onClose={onClose} wide centered label="Opportunity Assessment">
       <div className="ur-opp-modal">
         <div className="ur-opp-modal__icon" aria-hidden>
           <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
@@ -534,8 +534,8 @@ function CompsRail({ comps, onOpen }: { comps: RentComp[]; onOpen: (c: RentComp)
 
 // ─── Modal Sheet ──────────────────────────────────────────────────────────────
 
-function ModalSheet({ open, onClose, label, wide, children }: {
-  open: boolean; onClose: () => void; label?: string; wide?: boolean; children: React.ReactNode
+function ModalSheet({ open, onClose, label, wide, centered, children }: {
+  open: boolean; onClose: () => void; label?: string; wide?: boolean; centered?: boolean; children: React.ReactNode
 }) {
   useEffect(() => {
     if (!open) return
@@ -546,8 +546,8 @@ function ModalSheet({ open, onClose, label, wide, children }: {
   return (
     <div className={`ur-modal${open ? " is-open" : ""}`} aria-hidden={!open}>
       <div className="ur-modal__scrim" onClick={onClose} />
-      <div className={`ur-modal__sheet${wide ? " ur-modal__sheet--wide" : ""}`} role="dialog" aria-modal aria-label={label}>
-        <div className="ur-modal__grab" onClick={onClose} />
+      <div className={`ur-modal__sheet${wide ? " ur-modal__sheet--wide" : ""}${centered ? " ur-modal__sheet--centered" : ""}`} role="dialog" aria-modal aria-label={label}>
+        {!centered && <div className="ur-modal__grab" onClick={onClose} />}
         {children}
       </div>
     </div>
@@ -948,15 +948,16 @@ export function PropertyScreens({ propertyAddress, initialUnitType, initialEstim
       coc: initialUnit.coc,
     },
   })
-  const [screen, setScreen] = useState<"roll" | "unit">("roll")
+  const [screen, setScreen] = useState<"roll" | "unit">("unit")
   const [activeId, setActiveId] = useState(initialUnit.id)
   const [dir, setDir] = useState(1)
-  const [showOppModal, setShowOppModal] = useState(false)
+  const [showOppModal, setShowOppModal] = useState(true)
   const [form, setForm] = useState<{ open: boolean; mode: "add" | "edit" }>({ open: false, mode: "add" })
   const [leadOpen, setLeadOpen] = useState(false)
   const [modalComp, setModalComp] = useState<RentComp | null>(null)
   const [comps, setComps] = useState<RentComp[]>([])
   const [rubricQ, setRubricQ] = useState<Quantiles | null>(null)
+  const [rubricRents, setRubricRents] = useState<number[]>([])
 
   const unit = units.find((u) => u.id === activeId) ?? units[0]
   const st = unitState[unit.id] ?? { currentRent: unit.currentRent, target: unit.suggestedTarget, capRate: unit.capRate, coc: unit.coc }
@@ -965,24 +966,35 @@ export function PropertyScreens({ propertyAddress, initialUnitType, initialEstim
 
   // live unit merges mutable currentRent for all downstream cards
   const liveUnit = useMemo(() => ({ ...unit, currentRent: st.currentRent }), [unit, st.currentRent])
-  // apply rubric quantiles to the live unit's display
-  const displayUnit = useMemo(() => {
-    if (!rubricQ) return liveUnit
-    return {
-      ...liveUnit,
-      q: rubricQ,
-      sliderMin: Math.min(liveUnit.sliderMin, Math.round((rubricQ.min * 0.94) / 5) * 5),
-      sliderMax: Math.max(liveUnit.sliderMax, Math.round((rubricQ.max * 1.08) / 5) * 5),
-    }
-  }, [liveUnit, rubricQ])
 
-  // fetch rubric comps + quantiles
+  // apply rubric quantiles + real rent cloud to the live unit's display
+  const displayUnit = useMemo(() => {
+    const base = rubricQ
+      ? {
+          ...liveUnit,
+          q: rubricQ,
+          sliderMin: Math.min(liveUnit.sliderMin, Math.round((rubricQ.min * 0.94) / 5) * 5),
+          sliderMax: Math.max(liveUnit.sliderMax, Math.round((rubricQ.max * 1.08) / 5) * 5),
+        }
+      : liveUnit
+    if (rubricRents.length < 5) return base
+    const sorted = [...rubricRents].sort((a, b) => a - b)
+    return {
+      ...base,
+      cloud: rubricRents,
+      cloudMin: sorted[0],
+      cloudMax: sorted[sorted.length - 1],
+    }
+  }, [liveUnit, rubricQ, rubricRents])
+
+  // fetch rubric comps, quantiles, and real rent cloud
   useEffect(() => {
     if (!propertyAddress.lat || !propertyAddress.lng) return
     fetch(`/api/comps?lat=${propertyAddress.lat}&lng=${propertyAddress.lng}&bedrooms=${beds}&bathrooms=${initialUnit.baths}&zip=${encodeURIComponent(propertyAddress.zip ?? "")}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.comps) setComps(data.comps)
+        if (data.rents?.length >= 5) setRubricRents(data.rents)
         if (data.quantiles) {
           setRubricQ(data.quantiles)
           const median = data.quantiles.median
@@ -1055,6 +1067,7 @@ export function PropertyScreens({ propertyAddress, initialUnitType, initialEstim
               <UnitHeaderCard unit={displayUnit} currentRent={st.currentRent} target={st.target}
                 onCurrent={(v) => setVal("currentRent", v)}
                 onOppClick={st.target > st.currentRent ? () => setShowOppModal(true) : undefined} />
+              <MarketCard unit={displayUnit} currentRent={st.currentRent} target={st.target} />
               <GradeLadderCard unit={displayUnit} currentRent={st.currentRent} target={st.target} />
               <BudgetCard currentRent={st.currentRent} target={st.target}
                 capRate={st.capRate} coc={st.coc}
