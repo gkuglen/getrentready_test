@@ -21,6 +21,12 @@ interface BplusComp {
   listing_url: string
 }
 
+// Only include Oakland and Emeryville comps (excludes Berkeley, San Leandro, etc.)
+function isOakland(c: BplusComp): boolean {
+  const loc = (c.address + " " + c.city).toLowerCase()
+  return loc.includes("oakland") || loc.includes("emeryville")
+}
+
 // Haversine distance in miles between two lat/lng points
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 3958.8
@@ -44,6 +50,10 @@ const ZIP_TO_ZONE: Record<string, string> = {
   "94603": "east_oakland",  "94605": "east_oakland", "94621": "east_oakland",
 }
 const DEFAULT_ZONE = "lake_merritt"
+
+// Scatter plot / quantile search radius centered on the actual property address
+const PROPERTY_RADIUS_MILES = 1.0
+const MIN_NEARBY_COMPS = 8  // fall back to Oakland-wide if too few nearby
 
 // beds + baths → cache unit type ID
 function unitTypeId(beds: number, baths: number): string {
@@ -79,12 +89,15 @@ export async function GET(request: NextRequest) {
 
   const allComps: BplusComp[] = allCompsData as BplusComp[]
 
-  // Filter to matching bedroom count
+  // Filter to matching bedroom + bathroom count, Oakland/Emeryville only
   const matchingBR = allComps.filter(
-    (c) => parseInt(c.bedrooms) === bedrooms && c.rent !== null
+    (c) => parseInt(c.bedrooms) === bedrooms &&
+           parseInt(c.bathrooms) === bathrooms &&
+           isOakland(c) &&
+           c.rent !== null
   )
 
-  // Compute distance and sort
+  // Compute distance from property to each matching comp, sorted nearest-first
   const withDistance = matchingBR
     .map((c) => ({
       ...c,
@@ -92,14 +105,12 @@ export async function GET(request: NextRequest) {
     }))
     .sort((a, b) => a.distance - b.distance)
 
-  // Nearby comps within 1 mile (or closest 3 if none within 1mi)
-  const within1Mile = withDistance.filter((c) => c.distance <= 1.0)
-  const nearbyComps = within1Mile.length >= 2
-    ? within1Mile.slice(0, 5)
-    : withDistance.slice(0, 3)
-
-  // All same-BR rents from dataset for quartile computation
-  const allRents = matchingBR.map((c) => c.rent as number)
+  // Scatter plot: comps within 0.75mi of the property address
+  const nearbyComps = withDistance.filter((c) => c.distance <= PROPERTY_RADIUS_MILES)
+  // Fall back to Oakland-wide for quantile calculation if too few nearby comps
+  const scopedComps = nearbyComps.length >= MIN_NEARBY_COMPS ? nearbyComps : matchingBR
+  const zoneId = ZIP_TO_ZONE[zip] ?? DEFAULT_ZONE
+  const allRents = scopedComps.map((c) => c.rent as number)
 
   // Look up min/max from cache (no live API call)
   const cachedRange = getCachedRange(zip, bedrooms, bathrooms)
@@ -113,6 +124,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     quantiles,
     rents: allRents,
+    nearbyRents: nearbyComps.map((c) => c.rent as number),
     comps: nearbyComps.map((c) => ({
       address: c.address,
       city: c.city,
@@ -129,8 +141,8 @@ export async function GET(request: NextRequest) {
       listing_url: c.listing_url,
     })),
     dataSource: {
-      quantilesFrom: "GRR rubric dataset (B+ scored Oakland apartments)",
-      minMaxFrom: cachedRange ? `Rentcast cache (${cachedRange.zone.replace("_", " ")})` : "GRR dataset",
+      quantilesFrom: `GRR rubric — ${zoneId.replace(/_/g, " ")} (${allRents.length} comps${nearbyComps.length < MIN_NEARBY_COMPS ? ", Oakland-wide fallback" : ""})`,
+      minMaxFrom: cachedRange ? `Rentcast cache (${cachedRange.zone.replace(/_/g, " ")})` : "GRR dataset",
       totalSampleSize: matchingBR.length,
     },
   })

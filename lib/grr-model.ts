@@ -142,12 +142,17 @@ export function buildQuantiles(
     return { min: rentcastMin ?? 0, q1: 0, median: 0, q3: 0, max: rentcastMax ?? 0 }
   }
   const sorted = [...rents].sort((a, b) => a - b)
+  const q1 = Math.round(quantile(sorted, 0.25))
+  const q3 = Math.round(quantile(sorted, 0.75))
+  // Rubric data sets the true bounds; Rentcast only extends them outward
+  const rubricMin = sorted[0]
+  const rubricMax = sorted[sorted.length - 1]
   return {
-    min: rentcastMin ?? sorted[0],
-    q1: Math.round(quantile(sorted, 0.25)),
+    min: rentcastMin !== undefined ? Math.min(rentcastMin, rubricMin) : rubricMin,
+    q1,
     median: Math.round(quantile(sorted, 0.5)),
-    q3: Math.round(quantile(sorted, 0.75)),
-    max: rentcastMax ?? sorted[sorted.length - 1],
+    q3,
+    max: rentcastMax !== undefined ? Math.max(rentcastMax, rubricMax) : rubricMax,
   }
 }
 

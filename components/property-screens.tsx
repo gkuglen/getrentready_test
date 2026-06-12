@@ -115,16 +115,26 @@ function EditableRent({ value, min, max, onChange }: {
 
 // ─── Bullet Graph (unit header) — current is the draggable thumb ──────────────
 
-function BulletGraph({ currentRent, target, sliderMin, sliderMax, onChange }: {
-  currentRent: number; target: number
+function BulletGraph({ currentRent, q, sliderMin, sliderMax, onChange }: {
+  currentRent: number
+  q: Quantiles
   sliderMin: number; sliderMax: number; onChange: (v: number) => void
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState(false)
 
-  const pad = (sliderMax - sliderMin) * 0.04
-  const lo = sliderMin - pad, hi = sliderMax + pad
+  // Axis must always extend past the bar on both sides so grey shows
+  const spread = Math.max(q.q3 - q.q1, 100)
+  const lo = Math.min(q.min, q.q1 - spread * 0.38)
+  const hi = Math.max(q.min + 100, q.max, q.q3 + spread * 0.38)
   const pct = (v: number) => clamp((v - lo) / (hi - lo), 0, 1) * 100
+
+  // Q1 → Q3 bar (the B+ range)
+  const barL = pct(q.q1)
+  const barW = Math.max(0, pct(q.q3) - pct(q.q1))
+
+  const cP = pct(currentRent)
+  const tP = pct(q.q3)
 
   const valueFromX = useCallback((clientX: number) => {
     const el = trackRef.current; if (!el) return currentRent
@@ -148,19 +158,26 @@ function BulletGraph({ currentRent, target, sliderMin, sliderMax, onChange }: {
     if (e.key === "ArrowRight" || e.key === "ArrowUp") { onChange(clamp(currentRent + step, sliderMin, sliderMax)); e.preventDefault() }
   }
 
-  const cP = pct(currentRent), tP = pct(target)
-  const fillL = Math.min(cP, tP), fillW = Math.abs(tP - cP)
-
   return (
     <div className="ur-bullet">
       <div className="ur-bullet__track" ref={trackRef}
         onPointerDown={(e) => { setDrag(true); onChange(valueFromX(e.clientX)) }}>
+        {/* Grey rail = Min → Max full market range */}
         <div className="ur-bullet__rail" />
-        <div className="ur-bullet__fill" style={{ left: `${fillL}%`, width: `${fillW}%` }} />
-        <div className="ur-bullet__tgt" style={{ left: `${tP}%` }} title="Target rent" />
+        {/* Blue/purple bar = Q1 → Q3 (B+ range) */}
+        <div className="ur-bullet__bar" style={{ left: `${barL}%`, width: `${barW}%` }} />
+        {/* Target ellipse — pinned at Q3 / B+ mark */}
+        <div className="ur-bullet__tgt" style={{ left: `${tP}%` }} title={`B+ target: ${fmt$(q.q3)}`}
+          onPointerDown={(e) => e.stopPropagation()} />
+        {/* Current rent ellipse — draggable */}
         <button className={`ur-bullet__cur${drag ? " is-drag" : ""}`} style={{ left: `${cP}%` }}
+          onPointerDown={(e) => { e.stopPropagation(); setDrag(true) }}
           onKeyDown={onKey} role="slider" aria-label="Current rent (drag to adjust)"
           aria-valuenow={currentRent} aria-valuemin={sliderMin} aria-valuemax={sliderMax} />
+      </div>
+      <div className="ur-bullet__minmax">
+        <span>{fmtK(q.min)}</span>
+        <span>{fmtK(q.max)}</span>
       </div>
     </div>
   )
@@ -207,8 +224,8 @@ function UnitHeaderCard({ unit, currentRent, target, onCurrent, onOppClick }: {
       </div>
 
       <div className="ur-head__viz">
-        <BulletGraph currentRent={currentRent} target={target}
-          sliderMin={unit.sliderMin} sliderMax={unit.sliderMax} onChange={onCurrent} />
+        <BulletGraph currentRent={currentRent}
+          q={unit.q} sliderMin={unit.sliderMin} sliderMax={unit.sliderMax} onChange={onCurrent} />
         <div className="ur-head__foot">
           <div className="ur-rentcol">
             <div className="ur-rentcol__row">
@@ -220,9 +237,9 @@ function UnitHeaderCard({ unit, currentRent, target, onCurrent, onOppClick }: {
           </div>
           <div className="ur-rentcol ur-rentcol--right">
             <div className="ur-rentcol__row">
-              <GradePill grade={tgtGrade} tone="good" />
-              <span className="ur-rentcol__val">{fmt$(target)}</span>
               <span className="ur-dotkey ur-dotkey--tgt" />
+              <span className="ur-rentcol__val">{fmt$(target)}</span>
+              <GradePill grade={tgtGrade} tone="good" />
             </div>
             <div className="ur-rentcol__lbl">Target</div>
           </div>
@@ -292,15 +309,31 @@ function niceTicks(min: number, max: number, count = 4): number[] {
   return out
 }
 
-function MarketCard({ unit, currentRent, target }: { unit: Unit; currentRent: number; target: number }) {
-  const dataMin = Math.min(unit.cloudMin, currentRent, target)
-  const dataMax = Math.max(unit.cloudMax, currentRent, target)
-  const pad = (dataMax - dataMin) * 0.07 || 50
-  const xMin = dataMin - pad, xMax = dataMax + pad
+function MarketCard({ unit, currentRent, target, scatterComps }: { unit: Unit; currentRent: number; target: number; scatterComps?: RentComp[] }) {
+  const q = unit.q
+  const range = q.max - q.min || 500
+  const pad = range * 0.04
+  const xMin = q.min - pad, xMax = q.max + pad
 
-  const W = 560, H = 140, padL = 16, padR = 16
-  const baseY = 60, band = 70, axisBot = H - 30
+  const W = 560, H = 168, padL = 28, padR = 28
+  const baseY = 72, band = 76, axisBot = H - 42
   const x = (v: number) => padL + ((v - xMin) / (xMax - xMin)) * (W - padL - padR)
+
+  const [tooltip, setTooltip] = useState<{ comp: RentComp; sx: number; sy: number } | null>(null)
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showTip = (comp: RentComp, sx: number, sy: number) => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+    setTooltip({ comp, sx, sy })
+  }
+  const scheduleHide = () => {
+    hideTimer.current = setTimeout(() => setTooltip(null), 220)
+  }
+  const cancelHide = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+  }
+
+  useEffect(() => () => { if (hideTimer.current) clearTimeout(hideTimer.current) }, [])
 
   const pts = useMemo(() => {
     let s = unit.market.seed * 7 + 11
@@ -310,29 +343,102 @@ function MarketCard({ unit, currentRent, target }: { unit: Unit; currentRent: nu
       t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296
     }
-    return unit.cloud.map((rent) => ({
-      rent, cy: baseY + (rng() + rng() - 1) * (band / 2), r: 4 + rng() * 2.5,
+    if (scatterComps) {
+      return scatterComps
+        .filter(c => c.rent !== null)
+        .map(c => ({
+          rent: c.rent as number,
+          cy: baseY + (rng() + rng() - 1) * (band / 2),
+          comp: c,
+        }))
+    }
+    return unit.cloud.map(rent => ({
+      rent,
+      cy: baseY + (rng() + rng() - 1) * (band / 2),
+      comp: null as RentComp | null,
     }))
-  }, [unit.id])
+  }, [scatterComps ? scatterComps.length : unit.cloud.length, scatterComps ? scatterComps[0]?.rent : unit.cloudMin])
 
-  const ticks = niceTicks(xMin, xMax, 4)
   const curGrade = gradeFromPct(pctRank(currentRent, unit.cloud))
   const tgtGrade = gradeFromPct(pctRank(target, unit.cloud))
 
+  const refs = [
+    { v: q.q1,     label: "Q1" },
+    { v: q.median, label: "Med" },
+    { v: q.q3,     label: "Q3" },
+  ]
+
+  const TIP_W = 172, TIP_H = 90
+
   return (
     <section className="ur-card">
-      <div className="ur-eyebrow">Market</div>
+      <div className="ur-eyebrow">Market — 2BR Oakland B+ Comps</div>
       <div className="ur-market__plot">
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" preserveAspectRatio="xMidYMid meet">
-          <line x1={padL} y1={12} x2={padL} y2={axisBot} className="ur-axis" strokeWidth="1" />
-          <line x1={padL} y1={axisBot} x2={W - padR} y2={axisBot} className="ur-axis" strokeWidth="1" />
-          {pts.map((p, i) => <circle key={i} cx={x(p.rent)} cy={p.cy} r={p.r} className="ur-dot" />)}
-          <circle cx={x(currentRent)} cy={baseY} r={5} className="ur-mark ur-mark--cur" />
-          <circle cx={x(target)} cy={baseY} r={4.5} className="ur-mark ur-mark--tgt"
-            style={{ transition: "cx .35s cubic-bezier(.22,1,.36,1)" }} />
-          {ticks.map((v) => (
-            <text key={v} x={x(v)} y={H - 10} className="ur-tick" textAnchor="middle">{fmtK(v)}</text>
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" preserveAspectRatio="xMidYMid meet"
+          onClick={() => setTooltip(null)}>
+
+          {/* Reference lines at Q1, Median, Q3 — name + dollar stacked at top */}
+          {refs.map(({ v, label }) => (
+            <g key={label}>
+              <line x1={x(v)} y1={30} x2={x(v)} y2={axisBot}
+                stroke="var(--ur-hair)" strokeWidth="1.5" strokeDasharray="4 3" />
+              <text x={x(v)} y={11} className="ur-tick" textAnchor="middle" fontSize="11">{label}</text>
+              <text x={x(v)} y={23} className="ur-tick" textAnchor="middle" fontSize="10">{fmtK(v)}</text>
+            </g>
           ))}
+
+          {/* Axis */}
+          <line x1={padL} y1={axisBot} x2={W - padR} y2={axisBot} className="ur-axis" strokeWidth="1" />
+
+          {/* Dots — tap/hover to reveal comp details */}
+          {pts.map((p, i) => {
+            const isActive = !!p.comp && tooltip?.comp === p.comp
+            return (
+              <circle
+                key={i}
+                cx={x(p.rent)} cy={p.cy}
+                r={isActive ? 6 : 4}
+                className={`ur-dot${isActive ? " ur-dot--active" : ""}`}
+                onMouseEnter={p.comp ? () => showTip(p.comp!, x(p.rent), p.cy) : undefined}
+                onMouseLeave={p.comp ? scheduleHide : undefined}
+                onClick={p.comp ? (e) => { e.stopPropagation(); setTooltip(t => t?.comp === p.comp ? null : { comp: p.comp!, sx: x(p.rent), sy: p.cy }) } : undefined}
+              />
+            )
+          })}
+
+          {/* Current rent marker — white with outline */}
+          <circle cx={x(currentRent)} cy={baseY} r={6} className="ur-mark ur-mark--cur" />
+          {/* Target marker — solid black */}
+          <circle cx={x(target)} cy={baseY} r={5.5} className="ur-mark ur-mark--tgt"
+            style={{ transition: "cx .35s cubic-bezier(.22,1,.36,1)" }} />
+
+          {/* Min / Max — anchored at far left and far right of axis */}
+          <text x={padL} y={H - 24} className="ur-tick" textAnchor="middle" fontSize="10">Min</text>
+          <text x={padL} y={H - 12} className="ur-tick" textAnchor="middle">{fmtK(q.min)}</text>
+          <text x={W - padR} y={H - 24} className="ur-tick" textAnchor="middle" fontSize="10">Max</text>
+          <text x={W - padR} y={H - 12} className="ur-tick" textAnchor="middle">{fmtK(q.max)}</text>
+
+          {/* Tooltip card — offset right of dot, stays open while hovered */}
+          {tooltip && (() => {
+            const spaceRight = W - padR - tooltip.sx
+            const tx = spaceRight >= TIP_W + 14
+              ? tooltip.sx + 12
+              : Math.max(padL, tooltip.sx - TIP_W - 12)
+            const ty = Math.max(4, tooltip.sy - TIP_H / 2 - 4)
+            const c = tooltip.comp
+            return (
+              <foreignObject x={tx} y={ty} width={TIP_W} height={TIP_H} style={{ overflow: "visible" }}>
+                <div className="ur-dot-tip"
+                  onMouseEnter={cancelHide}
+                  onMouseLeave={scheduleHide}>
+                  <div className="ur-dot-tip__rent">{fmt$(c.rent!)}</div>
+                  <div className="ur-dot-tip__addr">{c.address}</div>
+                  <div className="ur-dot-tip__meta">{c.bedrooms}br {c.bathrooms}ba{c.sqft ? ` · ${c.sqft} SF` : ""}</div>
+                  <div className="ur-dot-tip__grade">{c.grade}{c.market_score != null ? ` · ${c.market_score.toFixed(0)} overall` : ""}</div>
+                </div>
+              </foreignObject>
+            )
+          })()}
         </svg>
       </div>
       <div className="ur-market__legend">
@@ -997,12 +1103,12 @@ export function PropertyScreens({ propertyAddress, initialUnitType, initialEstim
         if (data.rents?.length >= 5) setRubricRents(data.rents)
         if (data.quantiles) {
           setRubricQ(data.quantiles)
-          const median = data.quantiles.median
+          const q3 = data.quantiles.q3
           setUnitState((prev) => {
             const next = { ...prev }
             Object.keys(next).forEach((id) => {
               if (next[id].target === initialUnit.suggestedTarget) {
-                next[id] = { ...next[id], target: Math.round(median / 5) * 5 }
+                next[id] = { ...next[id], target: Math.round(q3 / 5) * 5 }
               }
             })
             return next
@@ -1024,7 +1130,7 @@ export function PropertyScreens({ propertyAddress, initialUnitType, initialEstim
       seed: newSeed, n: f.name, address: propertyAddress.street,
       city: `${propertyAddress.city}, ${propertyAddress.state} ${propertyAddress.zip}`,
       beds: f.beds, baths: f.baths, sqft: f.sqft, currentRent: cr,
-      suggestedTarget: rubricQ ? Math.round(rubricQ.median / 5) * 5 : Math.round((cr * 1.12) / 5) * 5,
+      suggestedTarget: rubricQ ? Math.round(rubricQ.q3 / 5) * 5 : Math.round((cr * 1.12) / 5) * 5,
       median: rubricQ?.median ?? cr, amenities: f.amenities,
     })
     setUnits((arr) => [...arr, u])
@@ -1067,7 +1173,7 @@ export function PropertyScreens({ propertyAddress, initialUnitType, initialEstim
               <UnitHeaderCard unit={displayUnit} currentRent={st.currentRent} target={st.target}
                 onCurrent={(v) => setVal("currentRent", v)}
                 onOppClick={st.target > st.currentRent ? () => setShowOppModal(true) : undefined} />
-              <MarketCard unit={displayUnit} currentRent={st.currentRent} target={st.target} />
+              <MarketCard unit={displayUnit} currentRent={st.currentRent} target={st.target} scatterComps={comps.length > 0 ? comps : undefined} />
               <GradeLadderCard unit={displayUnit} currentRent={st.currentRent} target={st.target} />
               <BudgetCard currentRent={st.currentRent} target={st.target}
                 capRate={st.capRate} coc={st.coc}

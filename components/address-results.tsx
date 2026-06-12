@@ -55,7 +55,7 @@ function MarketBar({ low, rent, high }: { low: number; rent: number; high: numbe
   return (
     <div className="w-full">
       <svg width="100%" height="22" viewBox="0 0 199 22" preserveAspectRatio="none">
-        <rect x="0" y="0" width="199" height="14" rx="7" fill="#E9EAEA" />
+        <rect x="0" y="0" width="199" height="14" rx="7" fill="#ffffff" />
         <rect x={toX(low)} y="0" width={toX(high) - toX(low)} height="14" rx="7" fill="#4D6CFA" />
         <circle cx={toX(rent)} cy="20" r="2" fill="#9CA19B" />
       </svg>
