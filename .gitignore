@@ -18,3 +18,11 @@ node_modules
 .DS_Store
 .vercel
 .env*
+tsconfig.tsbuildinfo
+
+# Design reference assets (not used by the app)
+public/bullet_graph.svg
+public/histogram.svg
+public/histogram_on.svg
+public/scatterplot.svg
+public/scatterplot_on.svg
